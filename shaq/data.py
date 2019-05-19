@@ -17,6 +17,9 @@ def download_current_team_stats():
     """ Downloads up-to-date team data for the current season, cleans it,
         and saves it in a json file "data/team-stats.json"
     """
+    team_df = pd.DataFrame(teams.get_teams())
+    team_id_pairing = team_df[['abbreviation', 'id']]
+    team_id_pairing.columns = ['Tm', 'TEAM_ID']
 
     stat_columns = [
         "GP",
@@ -54,7 +57,7 @@ def download_current_team_stats():
     for t in teams.get_teams():
         t_id = t["id"]
         # print(t_id, end = ', ')
-        time.sleep(5)
+        time.sleep(1)
         stat_json = json.loads(
             teamyearbyyearstats.TeamYearByYearStats(int(t_id)).get_json()
         )
@@ -73,11 +76,12 @@ def download_current_team_stats():
         lambda x: int(x.to_string().split(" ")[-1].split("-")[0]) + 1, axis=1
     )
     team_stats[["YEAR"]] = fixed_years
-
+    team_stats.to_csv("data/nba-api-team-stats.csv")
+    team_stats = pd.read_csv("data/nba-api-team-stats.csv")
     team_stats = team_stats.drop(columns=["Unnamed: 0"])
-    team_stats = team_stats[team_df.YEAR >= earliest_season]
-    team_df.columns = ["Tm", "Year"] + stat_columns
-    team_df.to_json("../data/team-stats.json")
+    team_stats = team_stats[team_stats.YEAR >= earliest_season]
+    team_stats.columns = ["Tm", "Year"] + stat_columns
+    team_stats.to_json("data/team-stats.json")
 
 
 def get_df_from_html(html_file):
@@ -117,8 +121,8 @@ def process_soupy_df(df, yr):
     """
     """
     df["Year"] = yr
-    df.to_json(f"../data/scraped-player-data-{yr}.json")
-    df = pd.read_json(f"../data/scraped-player-data-{yr}.json")
+    df.to_json(f"data/scraped-player-data-{yr}.json")
+    df = pd.read_json(f"data/scraped-player-data-{yr}.json")
     df.replace("", np.nan)
     df = df.loc[df.MP > 300]
     df = df.fillna(0)
@@ -131,8 +135,8 @@ def download_current_player_stats():
     stats_url = f"https://www.basketball-reference.com/leagues/NBA_{latest_season}_per_poss.html"
     adv_stats_url = f"https://www.basketball-reference.com/leagues/NBA_{latest_season}_advanced.html"
 
-    stats_fname = f"../data/{latest_season}_per_poss.html"
-    adv_stats_fname = f"../data/{latest_season}_adv.html"
+    stats_fname = f"data/{latest_season}_per_poss.html"
+    adv_stats_fname = f"data/{latest_season}_adv.html"
     urllib.request.urlretrieve(stats_url, filename=stats_fname)
     urllib.request.urlretrieve(adv_stats_url, filename=adv_stats_fname)
     stats_df = get_df_from_html(stats_fname)
@@ -169,16 +173,16 @@ def download_current_player_stats():
         ]
     ]
     combined_stats = pd.merge(stats_df, adv_stats_df, on=["Player", "Year", "Tm"])
-    combined_stats.to_json(f"../data/{latest_season}-player.json")
+    combined_stats.to_json(f"data/{latest_season}-player.json")
 
 
 def merge_player_team_stats():
     """
     """
-    team_df = pd.read_json("../data/team-stats.json")
-    player_df = pd.read_json(f"../data/{latest_season}-player.json")
+    team_df = pd.read_json("data/team-stats.json")
+    player_df = pd.read_json(f"data/{latest_season}-player.json")
     combined_df = pd.merge(player_df, team_df, on=["Tm", "Year"])
-    combined_df.to_json(f"../data/{latest_season}-combined.json")
+    combined_df.to_json(f"data/{latest_season}-combined.json")
 
 
 def download_current_stats():
